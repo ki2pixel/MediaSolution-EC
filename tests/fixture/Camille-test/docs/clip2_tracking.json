@@ -1,0 +1,10 @@
+{
+  "frames_analysis": [
+    { "frame": 0, "tracked_objects": [ { "id": "face-1", "source": "face_landmarker", "label": "face", "centroid_x": 100.0, "confidence": 0.8, "bbox_width": 50.0, "bbox_height": 80.0, "active_speakers": ["SPEAKER_00"] } ] },
+    { "frame": 10, "tracked_objects": [ { "id": "face-1", "source": "face_landmarker", "label": "face", "centroid_x": 400.0, "confidence": 0.85, "bbox_width": 52.0, "bbox_height": 82.0, "active_speakers": ["SPEAKER_00"] } ] },
+    { "frame": 30, "tracked_objects": [ { "id": "face-1", "source": "face_landmarker", "label": "face", "centroid_x": 150.0, "confidence": 0.9, "bbox_width": 54.0, "bbox_height": 84.0, "active_speakers": [] } ] },
+    { "frame": 45, "tracked_objects": [ { "id": "person-1", "source": "object_detector", "label": "person", "centroid_x": 300.0, "confidence": 0.7, "bbox_width": 120.0, "bbox_height": 240.0, "active_speakers": [] } ] },
+    { "frame": 60, "tracked_objects": [ { "id": "person-1", "source": "object_detector", "label": "person", "centroid_x": 310.0, "confidence": 0.72, "bbox_width": 121.0, "bbox_height": 241.0, "active_speakers": [] } ] },
+    { "frame": 80, "tracked_objects": [ { "id": "person-1", "source": "object_detector", "label": "person", "centroid_x": 320.0, "confidence": 0.68, "bbox_width": 119.0, "bbox_height": 239.0, "active_speakers": [] } ] }
+  ]
+}

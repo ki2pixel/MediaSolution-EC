@@ -1,0 +1,24 @@
+{
+  "dataByFrame": {
+    "0": [
+      { "id": "face-1", "centroid_x": 240.0, "source": "face_landmarker", "label": "face", "confidence": 0.95, "bbox_width": 60.0, "bbox_height": 90.0, "bbox_surface": 5400.0 }
+    ],
+    "15": [
+      { "id": "face-1", "centroid_x": 250.0, "source": "face_landmarker", "label": "face", "confidence": 0.93, "bbox_width": 62.0, "bbox_height": 92.0, "bbox_surface": 5704.0 }
+    ],
+    "30": [
+      { "id": "face-1", "centroid_x": 260.0, "source": "face_landmarker", "label": "face", "confidence": 0.9, "bbox_width": 61.0, "bbox_height": 91.0, "bbox_surface": 5551.0 }
+    ],
+    "45": [
+      { "id": "face-1", "centroid_x": 270.0, "source": "face_landmarker", "label": "face", "confidence": 0.94, "bbox_width": 63.0, "bbox_height": 93.0, "bbox_surface": 5859.0 }
+    ],
+    "60": [
+      { "id": "face-1", "centroid_x": 280.0, "source": "face_landmarker", "label": "face", "confidence": 0.92, "bbox_width": 60.0, "bbox_height": 90.0, "bbox_surface": 5400.0 }
+    ],
+    "75": [
+      { "id": "face-1", "centroid_x": 300.0, "source": "face_landmarker", "label": "face", "confidence": 0.91, "bbox_width": 64.0, "bbox_height": 94.0, "bbox_surface": 6016.0 }
+    ]
+  },
+  "maxFrame": 75,
+  "audioByFrame": {}
+}

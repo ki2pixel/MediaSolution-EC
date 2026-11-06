@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Export .aep (Camille)
+GenericName=Export After Effects
+Comment=Convertit les projets EffectCraft (.ecproj) des dossiers Camille/Cvmille de /mnt/cache en projets After Effects (.aep) et Premiere Pro (.prproj)
+Exec=/usr/bin/python3 /home/kidpixel/Media_Solution/MediaSolution-EC/tools/export_aep_from_cache.py
+Path=/home/kidpixel/Media_Solution/MediaSolution-EC
+Icon=video-x-generic
+Terminal=false
+StartupNotify=false
+Categories=AudioVideo;
+Keywords=aep;prproj;premiere;after effects;ecproj;camille;export;effectcraft;
