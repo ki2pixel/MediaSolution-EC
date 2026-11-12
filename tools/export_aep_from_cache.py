@@ -8,10 +8,13 @@ Conçu pour le double-clic (raccourci .desktop) :
 Ce qu'il fait, en boucle : scan des dossiers projet de ROOT (ceux dont le nom contient
 l'un des filtres, insensible à la casse, et qui ont un sous-dossier `docs/` — même
 détection que le panel), puis conversion de **tous** les `.ecproj` trouvés sous ces
-dossiers vers `.aep` (convertisseur `ecproj_to_aep.py`, bibliothèque py_aep) **et vers
-`.prproj`** (convertisseur `ecproj_to_prproj.py`, Premiere 2026, hors Adobe). Le `.prproj`
-peut être désactivé avec `--no-prproj`.
+dossiers vers `.aep` (export natif EffectCraft, repli py_aep pour les cadences
+fractionnaires) **et vers `.prproj`** (convertisseur `ecproj_to_prproj.py`, Premiere
+2026, hors Adobe). Le `.prproj` peut être désactivé avec `--no-prproj`.
 Chaque exécution réécrit les `.aep` et `.prproj` : le résultat est toujours à jour.
+
+Les chemins de métrage sont **conservés** dans le `.aep` (défaut : aucun mapping, donc
+`/mnt/cache/...` reste inchangé). Le `.prproj` garde son mapping Windows `/mnt/cache ⇒ F:`.
 
 Les seuls réglages à modifier sont les constantes ci-dessous.
 """
@@ -31,8 +34,9 @@ from datetime import datetime
 ROOT = "/mnt/cache"                       # racine scannée (dossiers projet = ses enfants directs)
 NAME_FILTERS = ("camille",)               # sous-chaînes de nom de dossier — tuple : la virgule
                                           # est nécessaire même pour un seul filtre, ("camille",)
-PATH_MAP = [("/mnt/cache", "F:")]         # réécriture des chemins de médias pour Windows ; [] = inchangés
-VERIFY = True                             # relit chaque .aep produit avec py_aep (recommandé)
+AEP_PATH_MAP: list[tuple[str, str]] = []  # .aep : aucun mapping par défaut → /mnt/cache conservé
+PRPROJ_PATH_MAP = [("/mnt/cache", "F:")]  # .prproj : réécriture Windows, comme avant
+VERIFY = True                             # relit chaque .aep produit (import EffectCraft dry-run)
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aep_export.log")
 
 TITLE = "Export .aep + .prproj (Media Solution)"
@@ -181,24 +185,40 @@ def main() -> int:
     parser.add_argument("--filter", action="append", default=None, metavar="TEXTE",
                         help="filtre de nom de dossier (répétable ; défaut : les constantes du script)")
     parser.add_argument("--path-map", action="append", default=None, metavar="SRC=DST",
-                        help="réécriture des chemins de médias (répétable ; remplace la constante)")
+                        help="réécriture des chemins de médias pour .aep ET .prproj "
+                             "(répétable ; remplace les constantes)")
+    parser.add_argument("--aep-path-map", action="append", default=None, metavar="SRC=DST",
+                        help="réécriture des chemins pour le .aep uniquement "
+                             "(défaut : aucun mapping, /mnt/cache conservé)")
+    parser.add_argument("--prproj-path-map", action="append", default=None, metavar="SRC=DST",
+                        help="réécriture des chemins pour le .prproj uniquement "
+                             "(défaut : /mnt/cache ⇒ F:)")
     parser.add_argument("--no-verify", action="store_true", help="ne pas relire les .aep produits")
     parser.add_argument("--no-prproj", action="store_true",
                         help="ne pas produire les .prproj (seulement les .aep)")
+    parser.add_argument("--legacy", action="store_true",
+                        help="force l'ancien convertisseur .aep py_aep")
     parser.add_argument("--dry-run", action="store_true", help="liste seulement ce qui serait converti")
     parser.add_argument("--no-gui", action="store_true", help="sortie texte même sans terminal")
     args = parser.parse_args()
 
     filters = tuple(args.filter) if args.filter else NAME_FILTERS
-    if args.path_map is None:
-        maps = list(PATH_MAP)
+
+    def parse_maps(values: list[str]) -> list[tuple[str, str]]:
+        out: list[tuple[str, str]] = []
+        for value in values:
+            if "=" not in value:
+                parser.error(f"--path-map attend SRC=DST, reçu : {value}")
+            src, dst = value.split("=", 1)
+            out.append((src, dst))
+        return out
+
+    if args.path_map is not None:
+        aep_maps = parse_maps(args.path_map)
+        prproj_maps = parse_maps(args.path_map)
     else:
-        maps = []
-        for m in args.path_map:
-            if "=" not in m:
-                parser.error(f"--path-map attend SRC=DST, reçu : {m}")
-            src, dst = m.split("=", 1)
-            maps.append((src, dst))
+        aep_maps = parse_maps(args.aep_path_map) if args.aep_path_map is not None else list(AEP_PATH_MAP)
+        prproj_maps = parse_maps(args.prproj_path_map) if args.prproj_path_map is not None else list(PRPROJ_PATH_MAP)
     verify = VERIFY and not args.no_verify
     prproj_enabled = not args.no_prproj
 
@@ -211,7 +231,8 @@ def main() -> int:
     started = time.time()
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     header = (f"[{stamp}] ROOT={args.root} filtres={filters} "
-              f"mapping={maps or 'aucun'} dry_run={args.dry_run}")
+              f"aep_mapping={aep_maps or 'aucun'} prproj_mapping={prproj_maps or 'aucun'} "
+              f"dry_run={args.dry_run}")
 
     ui.say(f"{TITLE} — scan de {args.root}…")
     if not os.path.isdir(args.root):
@@ -255,18 +276,27 @@ def main() -> int:
         log_lines([header] + [f"  (dry-run) {p}" for p in projects] + ["  " + message])
         return 0
 
-    # Charge les convertisseurs et py_aep
+    # Charge les convertisseurs (.aep natif + repli legacy, .prproj inchangé)
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     try:
         import ecproj_to_aep as conv  # noqa: E402
-        py_aep = conv.load_py_aep(None)
-    except ImportError as e:
-        message = f"Convertisseur indisponible :\n{e}"
+    except Exception as e:
+        message = f"Convertisseur .aep indisponible :\n{e}"
         ui.finish(message, ok=False)
         log_lines([header, "  " + str(e)])
         return 2
-    ui.say(f"py_aep {conv.py_aep_info(py_aep)}")
-    log_lines([f"  py_aep {conv.py_aep_info(py_aep)}"])
+    if not args.legacy:
+        try:
+            engine_info = f"EffectCraft {conv.cli_info()}"
+        except Exception as e:
+            message = f"Export natif .aep indisponible :\n{e}\n\nUtilisez --legacy pour py_aep."
+            ui.finish(message, ok=False)
+            log_lines([header, "  " + str(e)])
+            return 2
+    else:
+        engine_info = "Export .aep legacy py_aep (--legacy)"
+    ui.say(engine_info)
+    log_lines([f"  {engine_info}"])
     if prproj_enabled:
         try:
             import ecproj_to_prproj as prproj_conv  # noqa: E402
@@ -287,7 +317,8 @@ def main() -> int:
         details: list[str] = []
         project_ok = True
         try:
-            result = conv.convert(src, base + ".aep", py_aep, maps, skip_missing=False)
+            result = conv.convert(src, base + ".aep", aep_maps,
+                                  force_legacy=args.legacy)
             detail = f"{result['comps']} comp(s), {result['layers']} calque(s)"
             if result.get("keys"):
                 detail += f", {result['keys']} keyframe(s)"
@@ -295,10 +326,23 @@ def main() -> int:
                 detail += f", {result['masks']} masque(s)"
             if result.get("effects"):
                 detail += f", {result['effects']} effet(s)"
+            if result.get("time_remaps"):
+                detail += f", {result['time_remaps']} time remap(s)"
+            if result.get("nulls"):
+                detail += f", {result['nulls']} objet(s) nul(s)"
+            detail += f" [{result.get('engine')}]"
             if verify:
-                conv.verify(base + ".aep", py_aep)
+                if result.get("engine") == "native":
+                    conv.verify_native(
+                        base + ".aep", conv.ensure_cli()[0],
+                        conv.expected_alias_paths(conv.load_ecproj(src), aep_maps),
+                    )
+                else:
+                    conv.verify_legacy(base + ".aep")
             details.append(f".aep : {detail}")
-            for warning in (result.get("mask_warnings") or []) + (result.get("effect_warnings") or []):
+            if result.get("fallback_reason"):
+                details.append(f"! repli legacy : {result['fallback_reason']}")
+            for warning in result.get("warnings") or []:
                 details.append(f"! {warning}")
         except Exception as e:
             project_ok = False
@@ -317,7 +361,7 @@ def main() -> int:
             else:
                 try:
                     rep = prproj_conv.convert(
-                        src, base + ".prproj", maps, False, False,
+                        src, base + ".prproj", prproj_maps, False, False,
                         lambda message: log_lines([f"  [prproj] {message}"]))
                     details.append(f".prproj : {rep['items']} item(s), "
                                    f"{rep['audio_items']} audio")
@@ -340,8 +384,11 @@ def main() -> int:
         outputs = (f".aep et .prproj ({prproj_skipped} .prproj ignoré(s) : "
                    f"éléments non repris)")
     summary = (f"{ok_count}/{len(projects)} projet(s) converti(s) en {outputs} "
-               f"en {duration:.1f} s\nMédias réécrits : {' → '.join(f'{a} ⇒ {b}' for a, b in maps) if maps else 'aucun'}"
-               f"\nJournal : {LOG_FILE}")
+               f"en {duration:.1f} s\n"
+               f"AEP : {'chemins conservés (/mnt/cache)' if not aep_maps else ' → '.join(f'{a} ⇒ {b}' for a, b in aep_maps)}")
+    if prproj_enabled:
+        summary += (f"\nPRPROJ : {'aucun mapping' if not prproj_maps else ' → '.join(f'{a} ⇒ {b}' for a, b in prproj_maps)}")
+    summary += f"\nJournal : {LOG_FILE}"
     if failures:
         summary += "\n\nErreurs :\n" + "\n".join(f"• {f}" for f in failures[:5])
         if len(failures) > 5:

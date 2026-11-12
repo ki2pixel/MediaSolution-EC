@@ -13,7 +13,7 @@
  *   - plus de bridge Python : les calculs (CSV, snap, recentrage) sont ceux des
  *     fallbacks JavaScript d'origine ;
  *   - plus de dialogs fichier : les chemins se saisissent ou se détectent ;
- *   - projets au format .ecproj (EffectCraft ne lit/écrit pas les .aep) ;
+ *   - projets au format .ecproj (le panel n'appelle pas l'import/export .aep natif) ;
  *   - préférence requise : Préférences ▸ Scripting & Expressions ▸
  *     « Allow Scripts to Write Files and Access Network » (bouton d'activation inclus).
  *

@@ -147,6 +147,31 @@ effectcraft-cli exec file.exportLottie '{"comp":"Main","path":"anim.json","inclu
 effectcraft-cli render-frame projet.ecproj --comp Main --time 1.5 --out vignette.png --transparent
 ```
 
+### 4.4 Export After Effects `.aep` (`file.exportAep`, EffectCraft ≥ 0.24.1)
+
+```bash
+# analyse seule : rapport de pertes, rien n'est écrit
+effectcraft-cli exec file.exportAep '{"path":"projet.aep","dryRun":true}' projet.ecproj --json
+
+# export réel (échoue si le rapport contient des pertes, même bénignes)
+effectcraft-cli exec file.exportAep '{"path":"projet.aep"}' projet.ecproj --json
+
+# écriture malgré des pertes explicites
+effectcraft-cli exec file.exportAep '{"path":"projet.aep","allowLosses":true}' projet.ecproj --json
+```
+- **Chemins de métrage** : les chemins stockés dans le `.ecproj` sont écrits **tels
+  quels** (alias `Als2/alas`) ; aucun mapping implicite. Pour réécrire un préfixe,
+  modifier le `.ecproj` (copie temporaire) avant l'export.
+- **Pertes** : sans `allowLosses`, la commande refuse d'écrire si le rapport contient
+  des pertes (les catégories bénignes comme les guides restent des pertes au sens de
+  la commande). Lire `report.losses` en `dryRun` pour les classer avant d'autoriser.
+- **Relecture** : `file.importAep` accepte aussi `dryRun` et renvoie le rapport d'import
+  (`imported`, `losses`) — c'est la vérification utilisée par
+  `tools/ecproj_to_aep.py --verify`.
+- **Cadences fractionnaires** : les clips/séquences 29,97 / 23,976 / 59,94 ne sont pas
+  exportés par 0.24.1 (seules les cadences entières sont échantillonnées). Le
+  convertisseur du dépôt bascule alors sur py_aep.
+
 ---
 
 ## 5. Étude de cas : Automatiser un ScriptUI Panel (`MediaSolution.jsx`)

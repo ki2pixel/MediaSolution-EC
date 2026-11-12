@@ -17,7 +17,8 @@ Le workflow repris à l'identique :
 
 ## Prérequis
 
-- EffectCraft (testé sur 0.4.0) avec sa CLI `effectcraft-cli`.
+- EffectCraft avec sa CLI `effectcraft-cli` (panel testé sur 0.4.0 ; l'export `.aep`
+  natif demande la CLI **≥ 0.24.1**, le repli `--legacy` fonctionne sans).
 - **Préférences ▸ Scripting & Expressions ▸ « Allow Scripts to Write Files and Access
   Network »** : sans elle, le scripting ne peut ni lire les CSV/tracking hors dossier
   projet, ni écrire logs/config/projets. Le panel propose un bouton **« Activer »**.
@@ -137,29 +138,30 @@ exécute `effectcraft-cli script` en headless sur les dossiers du manifeste
 
 ## Exporter aussi en .aep (post-traitement)
 
-EffectCraft n'écrit pas de `.aep` : l'export se fait **hors EffectCraft**, en
-post-traitement du batch, avec la bibliothèque py_aep (`Scripts/py-aep-0.18.2` en
-priorité — le même chemin que l'ancien mode « py_aep Offline » du bridge Windows ;
-`Scripts/py_aep-0.18.1` et `Scripts/py_aep-0.13.0` restent utilisables, les
-convertisseurs prennent la version la plus récente présente et s'adaptent à sa
-convention de masques). Sont repris : médias, **solides** (couleur, largeur/hauteur,
-pixel aspect), comps (nom/taille/pixel aspect/cadence/durée) et calques (nom, in/out, audio,
-label) avec
-tout le **groupe Transform** (anchor, position, échelle, orientation, rotations, opacité)
-— **valeurs statiques et keyframes** (temps, valeurs, interpolation linéaire/bezier/hold,
-easings temporels, tangentes spatiales) — plus les **masques** (forme, mode, inversion,
-couleur, feather + falloff, opacité, expansion, roto-bezier), les **effets** reconnus par
-la table `EFFECT_MAP` (Gaussian Blur pour l'instant : intensité, dimensions, repeat edge)
-et le **Time Remap** (Freeze Frame : une clé Hold, donc l'image figée sur tout le calque).
+Depuis EffectCraft 0.24.1, l'export `.aep` est **natif** (`file.exportAep`) : le
+convertisseur `tools/ecproj_to_aep.py` passe par `effectcraft-cli`, sans py_aep dans le
+cas courant. Sont écrits par EffectCraft : comps, calques, parenté, **objets nuls**,
+solides, métrages, transforms et keyframes, masques, effets de sa table, Time Remap,
+labels, audio et réglages projet. Tout ce qui n'est pas repris est signalé dans le
+rapport d'export.
 
-Ce qui n'est **pas** repris : les autres familles de propriétés (formes, texte, expressions,
-autres effets), qui restent spécifiques à EffectCraft.
+**Chemins de métrage** : l'export natif écrit le chemin stocké dans le `.ecproj` **tel
+quel**. Un projet qui référence `/mnt/cache/...` produit donc un `.aep` qui référence
+`/mnt/cache/...`, sans relink ni mapping implicite. C'est le comportement par défaut.
+`--path-map SRC=DST` reste disponible (copie temporaire du `.ecproj`) si un mapping
+Windows est nécessaire.
 
-Les effets s'appuient sur `tools/ae_effect_defs.aepdefs` (gabarits AE extraits d'un projet
-Adobe réel) : py_aep ne sait créer un effet que si sa définition figure déjà dans le projet
-(`LIST:EfdG`). Pour ajouter un effet à terme : l'ajouter à `EFFECT_MAP` (ecproj_to_aep.py)
-puis reconstruire le fichier de définitions avec
-`python3 tools/extract_ae_effect_defs.py <projet.aep> --effects "ADBE …"`.
+**Repli py_aep** : les clips et séquences à cadence fractionnaire (29,97 / 23,976 /
+59,94) ne sont pas encore exportés par EffectCraft 0.24.1. Le convertisseur bascule
+automatiquement sur l'ancien moteur py_aep (`tools/ecproj_to_aep_legacy.py`) pour ces
+projets, avec un message explicite. L'ancien comportement est conservé : les objets nuls
+sont alors supprimés et les positions parentées écrites en coordonnées monde. Utiliser
+`--no-fallback` pour refuser ce repli, ou `--legacy` pour forcer l'ancien moteur.
+
+**Pertes** : les pertes bénignes connues (alpha `Straight`, profil couleur standard,
+guides, noms tronqués, temps arrondis) sont autorisées et journalisées. Toute perte qui
+change le rendu bloque la conversion, avec `--allow-losses` comme échappatoire
+(déconseillé). Les erreurs indiquent les catégories concernées.
 
 ### Double-clic (usage courant)
 
@@ -171,8 +173,8 @@ Un raccourci est installé sur le Bureau et dans le menu des applications :
   convertit **tous** les `.ecproj` trouvés en `.aep` **et en `.prproj`** à côté d'eux, avec
   barre de progression et résumé en fenêtres (zenity). `--no-prproj` limite la sortie aux `.aep`.
 - Le détail de chaque passage est journalisé dans `tools/aep_export.log`.
-- Les médias sont lus depuis les chemins Linux, mais **écrits dans le `.aep` sous
-  `F:`** (`/mnt/cache` ⇒ `F:`), pour que Windows retrouve les fichiers directement.
+- Le `.aep` conserve les chemins `/mnt/cache` ; le `.prproj` garde son mapping Windows
+  `/mnt/cache ⇒ F:` (comportement inchangé).
 
 ### Ligne de commande
 
@@ -183,36 +185,37 @@ python3 tools/export_aep_from_cache.py --dry-run --no-gui
 python3 tools/export_aep_from_cache.py --no-gui
 # .aep seulement :
 python3 tools/export_aep_from_cache.py --no-gui --no-prproj
+# forcer l'ancien moteur py_aep :
+python3 tools/export_aep_from_cache.py --no-gui --legacy
 
 # un projet précis, avec relecture de vérification :
 python3 tools/ecproj_to_aep.py "/mnt/cache/89 Camille/projets/xxx_9x16.ecproj" --verify
-# tout un dossier, chemins réécrits pour Windows :
+# tout un dossier, chemins conservés (défaut) :
+python3 tools/ecproj_to_aep.py "/mnt/cache/89 Camille/projets" --all --verify
+# avec mapping Windows explicite :
 python3 tools/ecproj_to_aep.py "/mnt/cache/89 Camille/projets" --all \
   --path-map "/mnt/cache=F:" --verify
 ```
 
-Réglages du scan (racine, filtres, mapping) : constantes en tête de
+Réglages du scan (racine, filtres, mappings) : constantes en tête de
 `tools/export_aep_from_cache.py`. `NAME_FILTERS` est un **tuple** — la virgule est
-nécessaire même pour un seul filtre (`("camille",)`) ; une chaîne seule est acceptée par
-sécurité mais un filtre d'un seul caractère est refusé. Le média est toujours **lu** depuis
-le chemin réel (Linux) ; `--path-map` ne change que le chemin **écrit** dans le `.aep`.
+nécessaire même pour un seul filtre (`("camille",)`). Le filtre par défaut ne capture que
+les dossiers contenant « camille » ; pour les dossiers « Cvmille », utiliser
+`--filter cvmille` (ou `--filter mille`). `AEP_PATH_MAP` est vide par défaut (chemins
+conservés) ; `PRPROJ_PATH_MAP` garde `/mnt/cache ⇒ F:`. Les deux se règlent séparément
+(`--aep-path-map`, `--prproj-path-map`) ; `--path-map` s'applique aux deux.
 
-- Cible **After Effects 2026+** (version produite par `py_aep.new()`) ; sur une autre
-  version, ouvrir puis réenregistrer le projet dans AE.
-- Les **objets nuls** du panel ne sont **pas exportés** (ils servent à regrouper les
-  segments dans EffectCraft — py_aep n'expose pas la parenté). Leur effet est compensé :
-  la position des segments est écrite en coordonnées **monde** (celle d'avant la parenté),
-  donc le `.aep` rend exactement l'image du `.ecproj`.
-- Sans correspondance de chemin, AE demandera un relink ; `--skip-missing` produit
-  quand même le projet (calques sans média ignorés).
-- **Masques** : les coordonnées `.ecproj` (pixels source) sont réécrites dans l'espace que
-  lit After Effects (`pixels × comp/source`) ; sans effet quand la source a la taille de la
-  comp. `--mask-space comp` garde les coordonnées telles quelles (si un masque apparaissait
-  décalé/à l'échelle dans AE, c'est le réglage à changer). Un tracé de masque **animé** est
-  exporté à sa première clé (limite py_aep), avec avertissement ; les masques désactivés
-  dans EffectCraft ne sont pas exportés.
-- Un effet sans définition connue (ou absent de `EFFECT_MAP`) est signalé sur la sortie
-  d'erreur et ignoré ; la conversion continue.
+- Cible **After Effects 2026+** (export natif EffectCraft 0.24.1). Sur une version
+  antérieure d'EffectCraft, `--legacy` reste disponible (py_aep, cible AE 2026+).
+- Les **objets nuls** du panel sont **conservés** par l'export natif, avec les liens de
+  parenté ; le rendu est identique au `.ecproj`. Le repli legacy les supprime et écrit
+  les positions en coordonnées monde (comme avant).
+- Sans mapping, AE ouvrira les médias avec le chemin stocké (`/mnt/cache/...`). Si ce
+  chemin n'existe pas côté Windows, utiliser `--path-map` ou relinker dans AE.
+- `--verify` relit le `.aep` avec l'import EffectCraft (dry-run) et vérifie les alias de
+  métrage ; pour le legacy, il utilise py_aep.
+- Les options `--skip-missing`, `--effect-defs`, `--mask-space` et `--py-aep` ne
+  concernent que le moteur legacy.
 - Chaque passage réécrit les `.aep` (résultat toujours à jour).
 
 ## Export Premiere Pro (.prproj) — post-traitement optionnel
@@ -351,9 +354,11 @@ MediaSolution-EC/
   deploy.sh                  synchronisation vers la copie de travail ~/Media_Solution/MediaSolution-EC
   docs/COMPATIBILITY.md      correspondance avec le panel CEP, adaptations, limites, options
   CLI_AUTOMATION.md          guide du pilotage headless/bridge (CLI EffectCraft, garde-fous 0.8.0+)
-  tools/ecproj_to_aep.py     convertisseur .ecproj → .aep (py_aep, AE 2026+)
-  tools/ae_effect_defs.aepdefs      gabarits d'effets AE pour py_aep (EfdG)
-  tools/extract_ae_effect_defs.py   (re)construit ce fichier depuis un .aep Adobe
+  tools/ecproj_to_aep.py     convertisseur .ecproj → .aep (export natif EffectCraft, repli py_aep)
+  tools/ecproj_to_aep_legacy.py  ancien convertisseur py_aep (repli cadences fractionnaires)
+  tools/ecproj_common.py     helpers .ecproj partagés avec le convertisseur .prproj
+  tools/ae_effect_defs.aepdefs      gabarits d'effets AE pour le repli py_aep (EfdG)
+  tools/extract_ae_effect_defs.py   (re)construit ce fichier depuis un .aep Adobe (legacy)
   tools/export_aep_from_cache.py  scan de /mnt/cache (dossiers Camille/Cvmille) + export en lot
   tools/Export-AEP-Camille.desktop  raccourci à double-cliquer (installé sur le Bureau)
   tools/aep_export.log       journal des exports

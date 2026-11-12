@@ -2,10 +2,11 @@
 """extract_ae_effect_defs.py — extrait des définitions d'effets AE (`LIST:EfdG`) d'un .aep.
 
 py_aep ne sait créer un effet que si sa définition figure déjà dans le projet
-(`LIST:EfdG`) : le convertisseur `.aep` s'appuie donc sur un petit fichier de
-définitions (`ae_effect_defs.aepdefs`, à côté de ce script) qui en contient les
-gabarits. Ce script (re)construit ce fichier depuis n'importe quel .aep qui
-utilise déjà les effets voulus (projet Adobe réel).
+(`LIST:EfdG`) : le convertisseur **legacy** (`ecproj_to_aep_legacy.py`, repli pour les
+cadences fractionnaires) s'appuie donc sur un petit fichier de définitions
+(`ae_effect_defs.aepdefs`, à côté de ce script) qui en contient les gabarits. Ce script
+(re)construit ce fichier depuis n'importe quel .aep qui utilise déjà les effets voulus
+(projet Adobe réel).
 
 Usage :
   python3 extract_ae_effect_defs.py SRC.aep --list
@@ -24,7 +25,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ecproj_to_aep import load_py_aep  # noqa: E402
+from ecproj_to_aep_legacy import load_py_aep  # noqa: E402
 
 # Effets que le convertisseur sait écrire (match names AE) — étendre ici.
 EFFECTS = ["ADBE Gaussian Blur 2"]
